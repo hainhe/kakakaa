@@ -4,12 +4,21 @@ import requests
 app = Flask(__name__)
 
 TELEGRAM_BOT_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'
-CHAT_ID = '1967814512'
+CHAT_ID = '-4708928215'
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.json
-    message = data.get('message', 'No message received')
+    try:
+        if request.is_json:
+            data = request.get_json(force=True)
+        else:
+            data = {"message": request.data.decode('utf-8')}  # Giải mã text raw
+        print("Received data:", data)
+        message = data.get('message', 'No message received')
+    except Exception as e:
+        print("Error parsing JSON:", str(e))
+        return "Invalid JSON", 400
+
     send_message_to_telegram(message)
     return "Webhook received", 200
 
@@ -26,4 +35,4 @@ def send_message_to_telegram(message):
         print(f"Failed to send message: {response.text}")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(port=5000)
