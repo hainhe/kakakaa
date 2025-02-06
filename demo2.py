@@ -64,7 +64,7 @@ SECONDARY_BOT_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot ph
 CHAT_ID = '-4708928215'
 
 # Thời gian của 1 nến 15 phút (tính bằng giây)
-ONE_CANDLE = 15 * 60  # 15 phút = 900 giây
+ONE_CANDLE = 60  # 15 phút = 900 giây
 TWO_CANDLES = 2 * ONE_CANDLE  # 30 phút = 1800 giây
 
 # Bộ nhớ lưu tín hiệu và trạng thái gửi huy chương
