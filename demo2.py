@@ -64,28 +64,59 @@
 
 from flask import Flask, request
 import requests
+import threading
+import time
 
 app = Flask(__name__)
 
-# Telegram Bot Token & Chat ID
-TELEGRAM_BOT_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'
-TELEGRAM_CHAT_ID = '-4708928215'
+TELEGRAM_BOT_TOKEN = "7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI"
+CHAT_ID = "-4708928215"
 
-# Hàm gửi tin nhắn Telegram
-def send_telegram_message(text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text}
-    requests.post(url, json=payload)
+# Danh sách lưu trữ các tín hiệu đến trong khoảng thời gian ngắn
+signal_buffer = []
+lock = threading.Lock()
 
-# Route nhận dữ liệu từ TradingView
-@app.route('/webhook', methods=['POST'])
+def send_telegram_message():
+    global signal_buffer
+    while True:
+        time.sleep(5)  # Gửi tin nhắn mỗi 5 giây nếu có tín hiệu mới
+
+        with lock:
+            if signal_buffer:
+                # Gộp tất cả các tín hiệu thành một tin nhắn duy nhất
+                symbols = " - ".join(signal_buffer)
+                message = f"🚨 LONG 🚨: {symbols}"
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                requests.post(url, json={"chat_id": CHAT_ID, "text": message})
+
+                # Xóa buffer sau khi gửi
+                signal_buffer = []
+
+# Route kiểm tra bot hoạt động
+@app.route("/")
+def index():
+    return "App is running!", 200
+
+# Route nhận tín hiệu từ TradingView
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.json
-    if data:
-        message = f"🚨 LONG 🚨: 🌜{data['symbol']}🌛\nThời gian: {data['time']}\nGiá: {data['price']}"
-        send_telegram_message(message)
+    global signal_buffer
+    try:
+        data = request.json
+        symbol = data.get("symbol", "").upper()
+        
+        if symbol:
+            with lock:
+                if symbol not in signal_buffer:  # Tránh trùng lặp
+                    signal_buffer.append(f"🌜{symbol}🌛")
 
-    return {"status": "success"}, 200
+        return "Webhook received", 200
+    except Exception as e:
+        return f"Error: {str(e)}", 400
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+# Chạy luồng riêng để gửi tin nhắn Telegram định kỳ
+threading.Thread(target=send_telegram_message, daemon=True).start()
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+
