@@ -145,4 +145,3 @@ print("✅ Bot chính đã khởi động!")
 
 if __name__ == '__main__':
     app.run(port=5000)
-
