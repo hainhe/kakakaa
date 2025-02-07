@@ -50,104 +50,45 @@
 #     app.run(port=5000)
 
 
+# from flask import Flask, request
+# import requests
+# import threading
+# import time
+
+# app = Flask(__name__)
+
+# # Token bot chính và bot phụ
+# MAIN_BOT_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'
+# SECONDARY_BOT_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'
+# CHAT_ID = '-4708928215'
+
 from flask import Flask, request
 import requests
-import threading
-import time
+import json
 
 app = Flask(__name__)
 
-# Token bot chính và bot phụ
-MAIN_BOT_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'
-SECONDARY_BOT_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'
-CHAT_ID = '-4708928215'
+# Thay thế bằng Token và ID Telegram của bạn
+TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
 
-# Lưu trạng thái tín hiệu theo cặp giao dịch
-signals = {}
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    requests.post(url, data=data)
 
-@app.route('/')
-def index():
-    return "App is running!", 200
-
-@app.route('/webhook', methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    try:
-        if request.is_json:
-            data = request.get_json(force=True)
-        else:
-            data = {"message": request.data.decode('utf-8')}
-        
-        print("📩 Nhận dữ liệu:", data)
-        message = data.get('message', 'No message received')
+    data = request.get_json()
+    if not data:
+        return {"message": "No data received"}, 400
 
-        send_message_to_telegram(MAIN_BOT_TOKEN, message)  # Gửi tín hiệu ngay
+    # Kiểm tra nếu là tín hiệu thì gửi về Telegram
+    if data.get("type") == "signal":
+        message = f"🚨 TÍN HIỆU 🚨: {data['ticker']} - {data['time']}\nOpen: {data['open']}, Close: {data['close']}"
+        send_telegram_message(message)
 
-        # Lấy cặp giao dịch từ tin nhắn
-        symbol = message.split(":")[1].strip()
+    return {"message": "Processed"}, 200
 
-        # Nếu có tín hiệu mới, reset lại bộ đếm nến
-        signals[symbol] = {"count": 0, "medal_1_sent": False, "medal_2_sent": False}
-        print(f"✅ Nhận tín hiệu mới: {symbol} (Reset bộ đếm nến)")
-
-        # 🔥 Thêm đoạn này để bot phụ thông báo bắt đầu theo dõi
-        send_message_to_telegram(SECONDARY_BOT_TOKEN, f"👀 Bắt đầu theo dõi cặp tiền {symbol} trong 2 nến tiếp theo...")
-
-    except Exception as e:
-        print("❌ Lỗi JSON:", str(e))
-        return "Invalid JSON", 400
-
-    return "Webhook received", 200
-
-
-def send_message_to_telegram(bot_token, message):
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {'chat_id': CHAT_ID, 'text': message}
-    response = requests.post(url, json=payload)
-
-    if response.status_code == 200:
-        print(f"📤 Gửi tin nhắn thành công: {message}")
-    else:
-        print(f"❌ Lỗi gửi tin ({bot_token}): {response.status_code}, {response.text}")
-
-def update_candles():
-    print("✅ Bot phụ đã khởi động và bắt đầu theo dõi nến...")
-
-    while True:
-        if signals:
-            print("⏳ Kiểm tra trạng thái các cặp tiền...", signals)
-
-        for symbol in list(signals.keys()):
-            signals[symbol]["count"] += 1
-            print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
-
-            # Kiểm tra xem cặp tiền có còn là tín hiệu hay không (chưa có API real-time, giả định tín hiệu sẽ không thay đổi)
-            if signals[symbol]["count"] == 1:
-                print(f"👀 Đang theo dõi {symbol}, kiểm tra nến đầu tiên...")
-                # Ở đây cần cơ chế kiểm tra tín hiệu thực tế, hiện tại giả định tín hiệu thay đổi sau khi bot chính gửi
-                is_signal = False  # ⚠️ Giả định rằng tín hiệu KHÔNG xuất hiện sau nến đầu tiên
-                if not is_signal and not signals[symbol]["medal_1_sent"]:
-                    print(f"📤 Đang gửi huy chương 1 cho {symbol}...")
-                    send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
-                    signals[symbol]["medal_1_sent"] = True
-
-            elif signals[symbol]["count"] == 2:
-                print(f"👀 Đang theo dõi {symbol}, kiểm tra nến thứ 2...")
-                is_signal = False  # ⚠️ Giả định rằng tín hiệu KHÔNG xuất hiện sau nến thứ 2
-                if not is_signal and not signals[symbol]["medal_2_sent"]:
-                    print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
-                    send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
-                    signals[symbol]["medal_2_sent"] = True
-
-                # Sau khi đã gửi huy chương 2, xóa tín hiệu
-                print(f"❌ Kết thúc theo dõi {symbol}, xóa khỏi danh sách")
-                del signals[symbol]
-
-        time.sleep(60)  # Mỗi nến 1 phút
-
-
-# Chạy cập nhật nến song song
-threading.Thread(target=update_candles, daemon=True).start()
-print("✅ Bot chính đã khởi động!")
-
-if __name__ == '__main__':
-    app.run(port=5000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
