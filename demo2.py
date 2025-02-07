@@ -64,31 +64,28 @@
 
 from flask import Flask, request
 import requests
-import json
 
 app = Flask(__name__)
 
-# Thay thế bằng Token và ID Telegram của bạn
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
+# Telegram Bot Token & Chat ID
+TELEGRAM_BOT_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'
+TELEGRAM_CHAT_ID = '-4708928215'
 
-def send_telegram_message(message):
+# Hàm gửi tin nhắn Telegram
+def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    requests.post(url, data=data)
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text}
+    requests.post(url, json=payload)
 
-@app.route("/webhook", methods=["POST"])
+# Route nhận dữ liệu từ TradingView
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json()
-    if not data:
-        return {"message": "No data received"}, 400
-
-    # Kiểm tra nếu là tín hiệu thì gửi về Telegram
-    if data.get("type") == "signal":
-        message = f"🚨 TÍN HIỆU 🚨: {data['ticker']} - {data['time']}\nOpen: {data['open']}, Close: {data['close']}"
+    data = request.json
+    if data:
+        message = f"🚨 LONG 🚨: 🌜{data['symbol']}🌛\nThời gian: {data['time']}\nGiá: {data['price']}"
         send_telegram_message(message)
 
-    return {"message": "Processed"}, 200
+    return {"status": "success"}, 200
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
