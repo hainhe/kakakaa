@@ -106,12 +106,11 @@ def send_message_to_telegram(bot_token, message):
     else:
         print(f"❌ Lỗi gửi tin ({bot_token}): {response.status_code}, {response.text}")
 
-# Hàm cập nhật số nến và gửi huy chương nếu cần
 def update_candles():
     print("✅ Bot phụ đã khởi động và bắt đầu theo dõi nến...")
     while True:
         if signals:
-            print("⏳ Kiểm tra trạng thái các cặp tiền...")
+            print("⏳ Kiểm tra trạng thái các cặp tiền...", signals)
 
         for symbol in list(signals.keys()):
             signals[symbol]["count"] += 1
@@ -126,9 +125,9 @@ def update_candles():
                 print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
                 signals[symbol]["medal_2_sent"] = True
-                del signals[symbol]  # Xóa khỏi danh sách theo dõi
+                del signals[symbol]
 
-        time.sleep(60)  # Chờ 1 phút (1 nến M1)
+        time.sleep(10)  # Giảm xuống còn 10 giây để test nhanh
 
 # Chạy cập nhật nến song song
 threading.Thread(target=update_candles, daemon=True).start()
