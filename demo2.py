@@ -72,51 +72,37 @@ app = Flask(__name__)
 TELEGRAM_BOT_TOKEN = "7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI"
 CHAT_ID = "-4708928215"
 
-# Danh sách lưu trữ các tín hiệu đến trong khoảng thời gian ngắn
-signal_buffer = []
+# Danh sách chứa các tín hiệu nhận được
+signals = set()
 lock = threading.Lock()
 
-def send_telegram_message():
-    global signal_buffer
+# Hàm gửi tin nhắn Telegram
+def send_message_to_telegram():
     while True:
-        time.sleep(5)  # Gửi tin nhắn mỗi 5 giây nếu có tín hiệu mới
-
+        time.sleep(5)  # Gửi tin nhắn mỗi 10 giây nếu có tín hiệu mới
         with lock:
-            if signal_buffer:
-                # Gộp tất cả các tín hiệu thành một tin nhắn duy nhất
-                symbols = " - ".join(signal_buffer)
-                message = f"🚨 LONG 🚨: {symbols}"
+            if signals:
+                message = "🚨 LONG 🚨: " + " - ".join([f"🌜{s}🌛" for s in signals])
+                signals.clear()
                 url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                requests.post(url, json={"chat_id": CHAT_ID, "text": message})
+                payload = {"chat_id": CHAT_ID, "text": message}
+                requests.post(url, json=payload)
 
-                # Xóa buffer sau khi gửi
-                signal_buffer = []
+# Chạy luồng gửi tin nhắn Telegram
+threading.Thread(target=send_message_to_telegram, daemon=True).start()
 
-# Route kiểm tra bot hoạt động
-@app.route("/")
-def index():
-    return "App is running!", 200
-
-# Route nhận tín hiệu từ TradingView
+# Webhook nhận tín hiệu từ TradingView
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    global signal_buffer
     try:
-        data = request.json
-        symbol = data.get("symbol", "").upper()
-        
+        data = request.get_json()
+        symbol = data.get("symbol")
         if symbol:
             with lock:
-                if symbol not in signal_buffer:  # Tránh trùng lặp
-                    signal_buffer.append(f"🌜{symbol}🌛")
-
-        return "Webhook received", 200
+                signals.add(symbol)
+        return "Received", 200
     except Exception as e:
         return f"Error: {str(e)}", 400
 
-# Chạy luồng riêng để gửi tin nhắn Telegram định kỳ
-threading.Thread(target=send_telegram_message, daemon=True).start()
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-
+    app.run(port=5000)
