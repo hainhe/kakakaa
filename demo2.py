@@ -120,22 +120,30 @@ def update_candles():
             signals[symbol]["count"] += 1
             print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
 
-            if signals[symbol]["count"] == 1 and not signals[symbol]["medal_1_sent"]:
-                print(f"📤 Đang gửi huy chương 1 cho {symbol}...")
-                send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
-                signals[symbol]["medal_1_sent"] = True
+            # Kiểm tra xem cặp tiền có còn là tín hiệu hay không (chưa có API real-time, giả định tín hiệu sẽ không thay đổi)
+            if signals[symbol]["count"] == 1:
+                print(f"👀 Đang theo dõi {symbol}, kiểm tra nến đầu tiên...")
+                # Ở đây cần cơ chế kiểm tra tín hiệu thực tế, hiện tại giả định tín hiệu thay đổi sau khi bot chính gửi
+                is_signal = False  # ⚠️ Giả định rằng tín hiệu KHÔNG xuất hiện sau nến đầu tiên
+                if not is_signal and not signals[symbol]["medal_1_sent"]:
+                    print(f"📤 Đang gửi huy chương 1 cho {symbol}...")
+                    send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
+                    signals[symbol]["medal_1_sent"] = True
 
-            elif signals[symbol]["count"] == 2 and not signals[symbol]["medal_2_sent"]:
-                print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
-                send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
-                signals[symbol]["medal_2_sent"] = True
+            elif signals[symbol]["count"] == 2:
+                print(f"👀 Đang theo dõi {symbol}, kiểm tra nến thứ 2...")
+                is_signal = False  # ⚠️ Giả định rằng tín hiệu KHÔNG xuất hiện sau nến thứ 2
+                if not is_signal and not signals[symbol]["medal_2_sent"]:
+                    print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
+                    send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
+                    signals[symbol]["medal_2_sent"] = True
 
-            # Xóa cặp tiền sau khi gửi huy chương 2 để tránh lỗi mất trạng thái
-            if signals[symbol]["count"] > 2:
+                # Sau khi đã gửi huy chương 2, xóa tín hiệu
                 print(f"❌ Kết thúc theo dõi {symbol}, xóa khỏi danh sách")
                 del signals[symbol]
 
-        time.sleep(60)  # Mỗi nến 1 phú
+        time.sleep(60)  # Mỗi nến 1 phút
+
 
 # Chạy cập nhật nến song song
 threading.Thread(target=update_candles, daemon=True).start()
