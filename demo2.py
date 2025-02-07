@@ -90,7 +90,7 @@ def webhook():
         print(f"✅ Nhận tín hiệu mới: {symbol} (Reset bộ đếm nến)")
 
         # 🔥 Thêm đoạn này để bot phụ thông báo bắt đầu theo dõi
-        send_message_to_telegram(SECONDARY_BOT_TOKEN, f"👀 Bắt đầu theo dõi cặp {symbol} trong 2 nến tiếp theo...")
+        send_message_to_telegram(SECONDARY_BOT_TOKEN, f"👀 Bắt đầu theo dõi cặp tiền {symbol} trong 2 nến tiếp theo...")
 
     except Exception as e:
         print("❌ Lỗi JSON:", str(e))
