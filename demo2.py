@@ -85,19 +85,19 @@ def webhook():
         # Lấy cặp giao dịch từ tin nhắn
         symbol = message.split(":")[1].strip()
 
-        # Nếu đã có tín hiệu trước đó thì reset bộ đếm
-        if symbol in signals:
-            print(f"🔄 {symbol} có tín hiệu mới, reset bộ đếm!")
-            signals[symbol]["count"] = 0  # Reset đếm
-            signals[symbol]["new_signal"] = True  # Đánh dấu có tín hiệu mới
-        else:
-            signals[symbol] = {"count": 0, "new_signal": True}  # Tạo mới tín hiệu
+        # Nếu có tín hiệu mới, reset lại bộ đếm nến
+        signals[symbol] = {"count": 0, "medal_1_sent": False, "medal_2_sent": False}
+        print(f"✅ Nhận tín hiệu mới: {symbol} (Reset bộ đếm nến)")
+
+        # 🔥 Thêm đoạn này để bot phụ thông báo bắt đầu theo dõi
+        send_message_to_telegram(SECONDARY_BOT_TOKEN, f"👀 Bắt đầu theo dõi cặp {symbol} trong 2 nến tiếp theo...")
 
     except Exception as e:
         print("❌ Lỗi JSON:", str(e))
         return "Invalid JSON", 400
 
     return "Webhook received", 200
+
 
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
