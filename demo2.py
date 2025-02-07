@@ -85,9 +85,13 @@ def webhook():
         # Lấy cặp giao dịch từ tin nhắn
         symbol = message.split(":")[1].strip()
 
-        # Reset đếm nếu nhận tín hiệu mới
-        signals[symbol] = {"count": 0}
-        print(f"✅ Nhận tín hiệu mới: {symbol} (Reset bộ đếm nến)")
+        # Nếu đã có tín hiệu trước đó thì reset bộ đếm
+        if symbol in signals:
+            print(f"🔄 {symbol} có tín hiệu mới, reset bộ đếm!")
+            signals[symbol]["count"] = 0  # Reset đếm
+            signals[symbol]["new_signal"] = True  # Đánh dấu có tín hiệu mới
+        else:
+            signals[symbol] = {"count": 0, "new_signal": True}  # Tạo mới tín hiệu
 
     except Exception as e:
         print("❌ Lỗi JSON:", str(e))
@@ -115,16 +119,23 @@ def update_candles():
             signals[symbol]["count"] += 1
             print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
 
-            # Kiểm tra từng nến sau tín hiệu
+            # Nếu có tín hiệu mới thì reset đếm
+            if signals[symbol]["new_signal"]:
+                print(f"⚡ {symbol} có tín hiệu mới trong nến này! Reset lại bộ đếm.")
+                signals[symbol]["count"] = 0
+                signals[symbol]["new_signal"] = False  # Đánh dấu tín hiệu đã xử lý
+                continue  # Bỏ qua kiểm tra huy chương
+
+            # Kiểm tra nến 1 sau tín hiệu
             if signals[symbol]["count"] == 1:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
                 print(f"📤 Gửi huy chương 1 cho {symbol}")
 
+            # Kiểm tra nến 2 sau tín hiệu
             elif signals[symbol]["count"] == 2:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
                 print(f"📤 Gửi huy chương 2 cho {symbol}")
-                # Reset lại để kiểm tra các nến tiếp theo
-                signals[symbol]["count"] = 0
+                del signals[symbol]  # Xóa khỏi danh sách theo dõi
 
         time.sleep(60)  # Chờ 1 phút (1 nến M1)
 
@@ -134,3 +145,4 @@ print("✅ Bot chính đã khởi động!")
 
 if __name__ == '__main__':
     app.run(port=5000)
+
