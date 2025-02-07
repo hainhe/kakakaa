@@ -53,6 +53,8 @@
 
 from flask import Flask, request
 import requests
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -74,9 +76,9 @@ def webhook():
         if request.is_json:
             data = request.get_json(force=True)
         else:
-            data = {"message": request.data.decode('utf-8')}  # Giải mã text raw
+            data = {"message": request.data.decode('utf-8')}
         
-        print("Received data:", data)
+        print("📩 Nhận dữ liệu:", data)
         message = data.get('message', 'No message received')
         
         send_message_to_telegram(MAIN_BOT_TOKEN, message)  # Gửi tín hiệu ngay
@@ -86,9 +88,10 @@ def webhook():
 
         # Nếu có tín hiệu mới, reset lại bộ đếm nến
         signals[symbol] = {"count": 0, "medal_1_sent": False, "medal_2_sent": False}
+        print(f"✅ Nhận tín hiệu mới: {symbol} (Reset bộ đếm nến)")
 
     except Exception as e:
-        print("Error parsing JSON:", str(e))
+        print("❌ Lỗi JSON:", str(e))
         return "Invalid JSON", 400
 
     return "Webhook received", 200
@@ -97,26 +100,37 @@ def webhook():
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {'chat_id': CHAT_ID, 'text': message}
-    requests.post(url, json=payload)
+    response = requests.post(url, json=payload)
+
+    if response.status_code == 200:
+        print(f"📤 Gửi tin nhắn thành công: {message}")
+    else:
+        print(f"❌ Lỗi gửi tin: {response.text}")
 
 # Hàm cập nhật số nến và gửi huy chương nếu cần
 def update_candles():
     while True:
+        if signals:
+            print("⏳ Kiểm tra trạng thái các cặp tiền...")
+
         for symbol in list(signals.keys()):
-            signals[symbol]["count"] += 1  # Tăng số nến đã trôi qua
-            
+            signals[symbol]["count"] += 1
+            print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
+
             if signals[symbol]["count"] == 1 and not signals[symbol]["medal_1_sent"]:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
                 signals[symbol]["medal_1_sent"] = True
+                print(f"🥇 Gửi huy chương 1 cho {symbol}")
 
             elif signals[symbol]["count"] == 2 and not signals[symbol]["medal_2_sent"]:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
-                del signals[symbol]  # Xóa để tránh báo lại
+                signals[symbol]["medal_2_sent"] = True
+                print(f"🥈 Gửi huy chương 2 cho {symbol}")
+                del signals[symbol]  # Xóa khỏi danh sách theo dõi
 
-        time.sleep(60)  # Chờ 1 nến M1
+        time.sleep(60)  # Chờ 1 phút (1 nến M1)
 
 # Chạy cập nhật nến song song
-import threading, time
 threading.Thread(target=update_candles, daemon=True).start()
 
 if __name__ == '__main__':
