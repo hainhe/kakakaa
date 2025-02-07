@@ -53,21 +53,15 @@
 
 from flask import Flask, request
 import requests
-import time
-import threading
 
 app = Flask(__name__)
 
 # Token bot chính và bot phụ
 MAIN_BOT_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'
-SECONDARY_BOT_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot phụ để gửi huy chương
+SECONDARY_BOT_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'
 CHAT_ID = '-4708928215'
 
-# Thời gian của 1 nến 15 phút (tính bằng giây)
-ONE_CANDLE = 60  # 15 phút = 900 giây
-TWO_CANDLES = 2 * ONE_CANDLE  # 30 phút = 1800 giây
-
-# Bộ nhớ lưu tín hiệu và trạng thái gửi huy chương
+# Lưu trạng thái tín hiệu theo cặp giao dịch
 signals = {}
 
 @app.route('/')
@@ -84,18 +78,14 @@ def webhook():
         
         print("Received data:", data)
         message = data.get('message', 'No message received')
-        send_message_to_telegram(MAIN_BOT_TOKEN, message)
+        
+        send_message_to_telegram(MAIN_BOT_TOKEN, message)  # Gửi tín hiệu ngay
 
-        # Lấy cặp giao dịch từ tin nhắn (có thể chỉnh lại nếu format khác)
-        symbol = message.split(":")[1].strip()  
+        # Lấy cặp giao dịch từ tin nhắn
+        symbol = message.split(":")[1].strip()
 
-        # Cập nhật trạng thái tín hiệu
-        current_time = time.time()
-        signals[symbol] = {
-            "time": current_time,
-            "sent_🥇": False,
-            "sent_🥈": False
-        }
+        # Nếu có tín hiệu mới, reset lại bộ đếm nến
+        signals[symbol] = {"count": 0, "medal_1_sent": False, "medal_2_sent": False}
 
     except Exception as e:
         print("Error parsing JSON:", str(e))
@@ -107,35 +97,29 @@ def webhook():
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {'chat_id': CHAT_ID, 'text': message}
-    response = requests.post(url, json=payload)
-    if response.status_code == 200:
-        print(f"Message sent successfully via bot {bot_token}!")
-    else:
-        print(f"Failed to send message: {response.text}")
+    requests.post(url, json=payload)
 
-# Kiểm tra và gửi huy chương nếu đủ điều kiện
-def check_signals():
+# Hàm cập nhật số nến và gửi huy chương nếu cần
+def update_candles():
     while True:
-        current_time = time.time()
-        
         for symbol in list(signals.keys()):
-            elapsed_time = current_time - signals[symbol]["time"]
+            signals[symbol]["count"] += 1  # Tăng số nến đã trôi qua
             
-            # Nếu sau 15 phút không có tín hiệu mới -> Gửi huy chương 🥇
-            if elapsed_time > ONE_CANDLE and not signals[symbol]["sent_🥇"]:
+            if signals[symbol]["count"] == 1 and not signals[symbol]["medal_1_sent"]:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
-                signals[symbol]["sent_🥇"] = True
-            
-            # Nếu sau 30 phút không có tín hiệu mới -> Gửi huy chương 🥈 và xóa tín hiệu
-            if elapsed_time > TWO_CANDLES and not signals[symbol]["sent_🥈"]:
-                send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
-                del signals[symbol]  # Xóa tín hiệu khỏi bộ nhớ
-        
-        time.sleep(10)  # Kiểm tra mỗi 10 giây
+                signals[symbol]["medal_1_sent"] = True
 
-# Chạy kiểm tra tín hiệu song song
-threading.Thread(target=check_signals, daemon=True).start()
+            elif signals[symbol]["count"] == 2 and not signals[symbol]["medal_2_sent"]:
+                send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
+                del signals[symbol]  # Xóa để tránh báo lại
+
+        time.sleep(60)  # Chờ 1 nến M1
+
+# Chạy cập nhật nến song song
+import threading, time
+threading.Thread(target=update_candles, daemon=True).start()
 
 if __name__ == '__main__':
     app.run(port=5000)
+
 
