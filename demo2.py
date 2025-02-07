@@ -111,6 +111,7 @@ def send_message_to_telegram(bot_token, message):
 
 def update_candles():
     print("✅ Bot phụ đã khởi động và bắt đầu theo dõi nến...")
+
     while True:
         if signals:
             print("⏳ Kiểm tra trạng thái các cặp tiền...", signals)
@@ -119,25 +120,22 @@ def update_candles():
             signals[symbol]["count"] += 1
             print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
 
-            # Nếu có tín hiệu mới thì reset đếm
-            if signals[symbol]["new_signal"]:
-                print(f"⚡ {symbol} có tín hiệu mới trong nến này! Reset lại bộ đếm.")
-                signals[symbol]["count"] = 0
-                signals[symbol]["new_signal"] = False  # Đánh dấu tín hiệu đã xử lý
-                continue  # Bỏ qua kiểm tra huy chương
-
-            # Kiểm tra nến 1 sau tín hiệu
-            if signals[symbol]["count"] == 1:
+            if signals[symbol]["count"] == 1 and not signals[symbol]["medal_1_sent"]:
+                print(f"📤 Đang gửi huy chương 1 cho {symbol}...")
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
-                print(f"📤 Gửi huy chương 1 cho {symbol}")
+                signals[symbol]["medal_1_sent"] = True
 
-            # Kiểm tra nến 2 sau tín hiệu
-            elif signals[symbol]["count"] == 2:
+            elif signals[symbol]["count"] == 2 and not signals[symbol]["medal_2_sent"]:
+                print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
-                print(f"📤 Gửi huy chương 2 cho {symbol}")
-                del signals[symbol]  # Xóa khỏi danh sách theo dõi
+                signals[symbol]["medal_2_sent"] = True
 
-        time.sleep(60)  # Chờ 1 phút (1 nến M1)
+            # Xóa cặp tiền sau khi gửi huy chương 2 để tránh lỗi mất trạng thái
+            if signals[symbol]["count"] > 2:
+                print(f"❌ Kết thúc theo dõi {symbol}, xóa khỏi danh sách")
+                del signals[symbol]
+
+        time.sleep(60)  # Mỗi nến 1 phú
 
 # Chạy cập nhật nến song song
 threading.Thread(target=update_candles, daemon=True).start()
