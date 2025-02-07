@@ -85,8 +85,8 @@ def webhook():
         # Lấy cặp giao dịch từ tin nhắn
         symbol = message.split(":")[1].strip()
 
-        # Nếu có tín hiệu mới, reset lại bộ đếm nến
-        signals[symbol] = {"count": 0, "medal_1_sent": False, "medal_2_sent": False}
+        # Reset đếm nếu nhận tín hiệu mới
+        signals[symbol] = {"count": 0}
         print(f"✅ Nhận tín hiệu mới: {symbol} (Reset bộ đếm nến)")
 
     except Exception as e:
@@ -95,7 +95,6 @@ def webhook():
 
     return "Webhook received", 200
 
-# Hàm gửi tin nhắn đến Telegram
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {'chat_id': CHAT_ID, 'text': message}
@@ -116,18 +115,18 @@ def update_candles():
             signals[symbol]["count"] += 1
             print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
 
-            if signals[symbol]["count"] == 1 and not signals[symbol]["medal_1_sent"]:
-                print(f"📤 Đang gửi huy chương 1 cho {symbol}...")
+            # Kiểm tra từng nến sau tín hiệu
+            if signals[symbol]["count"] == 1:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
-                signals[symbol]["medal_1_sent"] = True
+                print(f"📤 Gửi huy chương 1 cho {symbol}")
 
-            elif signals[symbol]["count"] == 2 and not signals[symbol]["medal_2_sent"]:
-                print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
+            elif signals[symbol]["count"] == 2:
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
-                signals[symbol]["medal_2_sent"] = True
-                del signals[symbol]
+                print(f"📤 Gửi huy chương 2 cho {symbol}")
+                # Reset lại để kiểm tra các nến tiếp theo
+                signals[symbol]["count"] = 0
 
-        time.sleep(10)  # Giảm xuống còn 10 giây để test nhanh
+        time.sleep(60)  # Chờ 1 phút (1 nến M1)
 
 # Chạy cập nhật nến song song
 threading.Thread(target=update_candles, daemon=True).start()
