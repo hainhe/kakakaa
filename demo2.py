@@ -50,7 +50,6 @@
 #     app.run(port=5000)
 
 
-
 from flask import Flask, request
 import requests
 import threading
@@ -80,7 +79,7 @@ def webhook():
         
         print("📩 Nhận dữ liệu:", data)
         message = data.get('message', 'No message received')
-        
+
         send_message_to_telegram(MAIN_BOT_TOKEN, message)  # Gửi tín hiệu ngay
 
         # Lấy cặp giao dịch từ tin nhắn
@@ -105,10 +104,11 @@ def send_message_to_telegram(bot_token, message):
     if response.status_code == 200:
         print(f"📤 Gửi tin nhắn thành công: {message}")
     else:
-        print(f"❌ Lỗi gửi tin: {response.text}")
+        print(f"❌ Lỗi gửi tin ({bot_token}): {response.status_code}, {response.text}")
 
 # Hàm cập nhật số nến và gửi huy chương nếu cần
 def update_candles():
+    print("✅ Bot phụ đã khởi động và bắt đầu theo dõi nến...")
     while True:
         if signals:
             print("⏳ Kiểm tra trạng thái các cặp tiền...")
@@ -118,22 +118,21 @@ def update_candles():
             print(f"🔄 {symbol}: {signals[symbol]['count']} nến đã qua")
 
             if signals[symbol]["count"] == 1 and not signals[symbol]["medal_1_sent"]:
+                print(f"📤 Đang gửi huy chương 1 cho {symbol}...")
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥇 Huy chương 1 cho {symbol}")
                 signals[symbol]["medal_1_sent"] = True
-                print(f"🥇 Gửi huy chương 1 cho {symbol}")
 
             elif signals[symbol]["count"] == 2 and not signals[symbol]["medal_2_sent"]:
+                print(f"📤 Đang gửi huy chương 2 cho {symbol}...")
                 send_message_to_telegram(SECONDARY_BOT_TOKEN, f"🥈 Huy chương 2 cho {symbol}")
                 signals[symbol]["medal_2_sent"] = True
-                print(f"🥈 Gửi huy chương 2 cho {symbol}")
                 del signals[symbol]  # Xóa khỏi danh sách theo dõi
 
         time.sleep(60)  # Chờ 1 phút (1 nến M1)
 
 # Chạy cập nhật nến song song
 threading.Thread(target=update_candles, daemon=True).start()
+print("✅ Bot chính đã khởi động!")
 
 if __name__ == '__main__':
     app.run(port=5000)
-
-
