@@ -120,20 +120,39 @@
 
 from flask import Flask, request
 import requests
+import threading
 import time
 
 app = Flask(__name__)
 
+# Mặc định thông tin bot và chat ID
 BOT1_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'  # Bot 1 nhận tín hiệu LONG/SHORT
 BOT2_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot 2 nhận tín hiệu 🥇🥈
 CHAT_ID = '-4708928215'  # ID nhóm Telegram nhận tin nhắn
 
-# Danh sách tin nhắn riêng biệt
-long_short_messages = []  # Dành cho Bot 1
-medal_messages = []       # Dành cho Bot 2
+# Danh sách tin nhắn tạm thời
+long_short_messages = []
+medal_messages = []
 
-last_sent_time = 0  # Thời gian gửi tin nhắn lần cuối
-TIME_THRESHOLD = 5   # Số giây tối thiểu giữa 2 lần gửi tin
+lock = threading.Lock()  # Để đảm bảo xử lý đồng bộ
+TIME_THRESHOLD = 5  # Số giây tối thiểu giữa các lần gửi tin
+
+def send_combined_messages():
+    global long_short_messages, medal_messages
+
+    while True:
+        time.sleep(TIME_THRESHOLD)  # Chờ đến chu kỳ gửi tin
+
+        with lock:
+            # Gửi tin nhắn từ Bot 1 (LONG/SHORT) nếu có
+            if long_short_messages:
+                send_message_to_telegram(BOT1_TOKEN, "\n".join(long_short_messages))
+                long_short_messages.clear()  # Xóa sau khi gửi thành công
+
+            # Gửi tin nhắn từ Bot 2 (Huân chương 🥇🥈) nếu có
+            if medal_messages:
+                send_message_to_telegram(BOT2_TOKEN, "\n".join(medal_messages))
+                medal_messages.clear()  # Xóa sau khi gửi thành công
 
 @app.route('/')
 def index():
@@ -141,8 +160,6 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global last_sent_time
-
     try:
         if request.is_json:
             data = request.get_json(force=True)
@@ -150,50 +167,32 @@ def webhook():
             data = {"message": request.data.decode('utf-8')}
         print("Received data:", data)
         message = data.get('message', 'No message received')
+
+        # Xác định loại tín hiệu và lưu vào danh sách phù hợp
+        with lock:
+            if "🚀 LONG 🚀" in message or "🚨 SHORT 🚨" in message:
+                long_short_messages.append(message)
+            elif "🥇" in message or "🥈" in message:
+                medal_messages.append(message)
+
     except Exception as e:
         print("Error parsing JSON:", str(e))
         return "Invalid JSON", 400
 
-    # Xác định loại tín hiệu và lưu vào danh sách phù hợp
-    if "🚀 LONG 🚀" in message or "🚨 SHORT 🚨" in message:
-        long_short_messages.append(message)
-    elif "🥇" in message or "🥈" in message:
-        medal_messages.append(message)
-
-    # Nếu đã đủ 5 giây từ lần gửi trước → Gửi tin gộp
-    current_time = time.time()
-    if current_time - last_sent_time >= TIME_THRESHOLD:
-        send_combined_messages()
-        last_sent_time = current_time  # Cập nhật thời gian gửi
-
     return "Webhook received", 200
-
-def send_combined_messages():
-    global long_short_messages, medal_messages
-
-    # Gửi tin nhắn từ Bot 1 (LONG/SHORT) nếu có
-    if long_short_messages:
-        send_message_to_telegram(BOT1_TOKEN, "\n".join(long_short_messages))
-        long_short_messages.clear()  # Xóa danh sách sau khi gửi
-
-    # Gửi tin nhắn từ Bot 2 (Huân chương 🥇🥈) nếu có
-    if medal_messages:
-        send_message_to_telegram(BOT2_TOKEN, "\n".join(medal_messages))
-        medal_messages.clear()  # Xóa danh sách sau khi gửi
 
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        'chat_id': CHAT_ID,
-        'text': message
-    }
+    payload = {'chat_id': CHAT_ID, 'text': message}
     response = requests.post(url, json=payload)
+    
     if response.status_code == 200:
-        print("Message sent successfully!")
+        print(f"✅ Message sent by {bot_token}:\n{message}")
     else:
-        print(f"Failed to send message: {response.text}")
+        print(f"❌ Failed to send message: {response.text}")
+
+# Chạy luồng gửi tin nhắn song song
+threading.Thread(target=send_combined_messages, daemon=True).start()
 
 if __name__ == '__main__':
     app.run(port=5000)
-
-
