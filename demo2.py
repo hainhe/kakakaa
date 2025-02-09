@@ -130,11 +130,11 @@ BOT1_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'  # Bot 1 nhận t�
 BOT2_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot 2 nhận tín hiệu 🥇🥈
 CHAT_ID = '-4708928215'  # ID nhóm Telegram nhận tin nhắn
 
-# Danh sách tin nhắn tạm thời
+# Hàng đợi tin nhắn
 long_short_messages = []
 medal_messages = []
-last_received_time = 0  # Thời điểm nhận tin nhắn gần nhất
-TIME_DELAY = 3  # Khoảng thời gian đợi gom tin nhắn (giây)
+last_sent_time = 0  # Lưu thời gian lần gửi cuối
+TIME_THRESHOLD = 3  # Số giây tối thiểu giữa các lần gửi
 
 @app.route('/')
 def index():
@@ -142,7 +142,7 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global last_received_time
+    global last_sent_time
 
     try:
         if request.is_json:
@@ -152,21 +152,17 @@ def webhook():
         print("Received data:", data)
         message = data.get('message', 'No message received')
 
-        # Xác định loại tín hiệu và lưu vào danh sách phù hợp
+        # Xác định loại tín hiệu và đưa vào hàng đợi
         if "🚀 LONG 🚀" in message or "🚨 SHORT 🚨" in message:
             long_short_messages.append(message)
         elif "🥇" in message or "🥈" in message:
             medal_messages.append(message)
 
-        # Cập nhật thời gian nhận tin nhắn gần nhất
-        last_received_time = time.time()
-
-        # Chờ gom tin nhắn trong 3 giây trước khi gửi
-        time.sleep(TIME_DELAY)
-
-        # Kiểm tra nếu đủ thời gian từ tin nhắn gần nhất thì gửi tin
-        if time.time() - last_received_time >= TIME_DELAY:
+        # Kiểm tra thời gian gửi tin nhắn
+        current_time = time.time()
+        if current_time - last_sent_time >= TIME_THRESHOLD:
             send_combined_messages()
+            last_sent_time = current_time  # Cập nhật thời gian gửi
 
     except Exception as e:
         print("Error parsing JSON:", str(e))
