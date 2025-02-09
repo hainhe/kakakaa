@@ -117,6 +117,7 @@
 # if __name__ == '__main__':
 #     app.run(port=5000)
 
+
 from flask import Flask, request
 import requests
 import time
@@ -127,9 +128,12 @@ BOT1_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'  # Bot 1 nhận t�
 BOT2_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot 2 nhận tín hiệu 🥇🥈
 CHAT_ID = '-4708928215'  # ID nhóm Telegram nhận tin nhắn
 
-message_buffer = []  # Danh sách lưu tin nhắn tạm thời
-last_sent_time = 0  # Lưu thời gian gửi tin cuối cùng
-TIME_THRESHOLD = 5  # Số giây tối thiểu giữa 2 lần gửi tin
+# Danh sách tin nhắn riêng biệt
+long_short_messages = []  # Dành cho Bot 1
+medal_messages = []       # Dành cho Bot 2
+
+last_sent_time = 0  # Thời gian gửi tin nhắn lần cuối
+TIME_THRESHOLD = 5   # Số giây tối thiểu giữa 2 lần gửi tin
 
 @app.route('/')
 def index():
@@ -150,8 +154,11 @@ def webhook():
         print("Error parsing JSON:", str(e))
         return "Invalid JSON", 400
 
-    # Thêm tin nhắn vào danh sách tạm
-    message_buffer.append(message)
+    # Xác định loại tín hiệu và lưu vào danh sách phù hợp
+    if "🚀 LONG 🚀" in message or "🚨 SHORT 🚨" in message:
+        long_short_messages.append(message)
+    elif "🥇" in message or "🥈" in message:
+        medal_messages.append(message)
 
     # Nếu đã đủ 5 giây từ lần gửi trước → Gửi tin gộp
     current_time = time.time()
@@ -162,20 +169,17 @@ def webhook():
     return "Webhook received", 200
 
 def send_combined_messages():
-    global message_buffer
+    global long_short_messages, medal_messages
 
-    if not message_buffer:
-        return  # Không có tin nhắn thì không gửi gì cả
+    # Gửi tin nhắn từ Bot 1 (LONG/SHORT) nếu có
+    if long_short_messages:
+        send_message_to_telegram(BOT1_TOKEN, "\n".join(long_short_messages))
+        long_short_messages.clear()  # Xóa danh sách sau khi gửi
 
-    combined_message = "\n".join(message_buffer)
-    
-    # Xác định bot phù hợp để gửi
-    if any("🚀 LONG 🚀" in msg or "🚨 SHORT 🚨" in msg for msg in message_buffer):
-        send_message_to_telegram(BOT1_TOKEN, combined_message)
-    elif any("🥇" in msg or "🥈" in msg for msg in message_buffer):
-        send_message_to_telegram(BOT2_TOKEN, combined_message)
-
-    message_buffer.clear()  # Xóa danh sách sau khi gửi
+    # Gửi tin nhắn từ Bot 2 (Huân chương 🥇🥈) nếu có
+    if medal_messages:
+        send_message_to_telegram(BOT2_TOKEN, "\n".join(medal_messages))
+        medal_messages.clear()  # Xóa danh sách sau khi gửi
 
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -191,4 +195,5 @@ def send_message_to_telegram(bot_token, message):
 
 if __name__ == '__main__':
     app.run(port=5000)
+
 
