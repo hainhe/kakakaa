@@ -119,7 +119,7 @@
 
 from flask import Flask, request
 import requests
-from apscheduler.schedulers.background import BackgroundScheduler
+import time
 
 app = Flask(__name__)
 
@@ -127,28 +127,9 @@ BOT1_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'  # Bot 1 nhận t�
 BOT2_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot 2 nhận tín hiệu 🥇🥈
 CHAT_ID = '-4708928215'  # ID nhóm Telegram nhận tin nhắn
 
-# Biến lưu tin nhắn
-messages_bot1 = []
-messages_bot2 = []
-
-# Hàm gửi tin nhắn gộp mỗi 5 giây
-def send_combined_messages():
-    global messages_bot1, messages_bot2
-
-    if messages_bot1:
-        combined_message = "\n".join(messages_bot1)
-        send_message_to_telegram(BOT1_TOKEN, combined_message)
-        messages_bot1.clear()  # Xóa danh sách sau khi gửi
-
-    if messages_bot2:
-        combined_message = "\n".join(messages_bot2)
-        send_message_to_telegram(BOT2_TOKEN, combined_message)
-        messages_bot2.clear()
-
-# Cấu hình scheduler (lập lịch chạy)
-scheduler = BackgroundScheduler()
-scheduler.add_job(send_combined_messages, 'interval', seconds=5)
-scheduler.start()
+message_buffer = []  # Danh sách lưu tin nhắn tạm thời
+last_sent_time = 0  # Lưu thời gian gửi tin cuối cùng
+TIME_THRESHOLD = 5  # Số giây tối thiểu giữa 2 lần gửi tin
 
 @app.route('/')
 def index():
@@ -156,6 +137,8 @@ def index():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    global last_sent_time
+
     try:
         if request.is_json:
             data = request.get_json(force=True)
@@ -167,13 +150,32 @@ def webhook():
         print("Error parsing JSON:", str(e))
         return "Invalid JSON", 400
 
-    # Gộp tin nhắn theo bot phù hợp
-    if "🚀 LONG 🚀" in message or "🚨 SHORT 🚨" in message:
-        messages_bot1.append(message)  # Thêm vào danh sách bot 1
-    elif "🥇" in message or "🥈" in message:
-        messages_bot2.append(message)  # Thêm vào danh sách bot 2
+    # Thêm tin nhắn vào danh sách tạm
+    message_buffer.append(message)
+
+    # Nếu đã đủ 5 giây từ lần gửi trước → Gửi tin gộp
+    current_time = time.time()
+    if current_time - last_sent_time >= TIME_THRESHOLD:
+        send_combined_messages()
+        last_sent_time = current_time  # Cập nhật thời gian gửi
 
     return "Webhook received", 200
+
+def send_combined_messages():
+    global message_buffer
+
+    if not message_buffer:
+        return  # Không có tin nhắn thì không gửi gì cả
+
+    combined_message = "\n".join(message_buffer)
+    
+    # Xác định bot phù hợp để gửi
+    if any("🚀 LONG 🚀" in msg or "🚨 SHORT 🚨" in msg for msg in message_buffer):
+        send_message_to_telegram(BOT1_TOKEN, combined_message)
+    elif any("🥇" in msg or "🥈" in msg for msg in message_buffer):
+        send_message_to_telegram(BOT2_TOKEN, combined_message)
+
+    message_buffer.clear()  # Xóa danh sách sau khi gửi
 
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -189,3 +191,4 @@ def send_message_to_telegram(bot_token, message):
 
 if __name__ == '__main__':
     app.run(port=5000)
+
