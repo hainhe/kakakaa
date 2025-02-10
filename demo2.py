@@ -121,7 +121,6 @@
 
 from flask import Flask, request
 import requests
-import time
 
 app = Flask(__name__)
 
@@ -130,58 +129,36 @@ BOT1_TOKEN = '7637391486:AAEYarDrhPKUkWzsoteS3yiVgB5QeiZdKoI'  # Bot 1 nhận t�
 BOT2_TOKEN = '7466054301:AAGexBfB5pNbwmnHP1ocC9jICxR__GSNgOA'  # Bot 2 nhận tín hiệu 🥇🥈
 CHAT_ID = '-4708928215'  # ID nhóm Telegram nhận tin nhắn
 
-# Hàng đợi tin nhắn
-long_short_messages = []
-medal_messages = []
-last_sent_time = 0  # Lưu thời gian lần gửi cuối
-TIME_THRESHOLD = 3  # Số giây tối thiểu giữa các lần gửi
-
 @app.route('/')
 def index():
     return "App is running!", 200
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    global last_sent_time
-
     try:
         if request.is_json:
             data = request.get_json(force=True)
         else:
             data = {"message": request.data.decode('utf-8')}
+        
         print("Received data:", data)
         message = data.get('message', 'No message received')
 
-        # Xác định loại tín hiệu và đưa vào hàng đợi
+        # Xử lý từng loại tín hiệu
         if "🚀 LONG 🚀" in message or "🚨 SHORT 🚨" in message:
-            long_short_messages.append(message)
-        elif "🥇" in message or "🥈" in message:
-            medal_messages.append(message)
+            send_message_to_telegram(BOT1_TOKEN, message)  # Bot 1 gửi LONG/SHORT
 
-        # Kiểm tra thời gian gửi tin nhắn
-        current_time = time.time()
-        if current_time - last_sent_time >= TIME_THRESHOLD:
-            send_combined_messages()
-            last_sent_time = current_time  # Cập nhật thời gian gửi
+        elif "👀 LONG nến 1 👀 (🥇)" in message or "👀 SHORT nến 1 👀 (🥇)" in message:
+            send_message_to_telegram(BOT2_TOKEN, message)  # Bot 2 gửi Huân chương 1 (🥇)
+
+        elif "👀 LONG nến 2 👀 (🥈)" in message or "👀 SHORT nến 2 👀 (🥈)" in message:
+            send_message_to_telegram(BOT2_TOKEN, message)  # Bot 2 gửi Huân chương 2 (🥈)
 
     except Exception as e:
         print("Error parsing JSON:", str(e))
         return "Invalid JSON", 400
 
     return "Webhook received", 200
-
-def send_combined_messages():
-    global long_short_messages, medal_messages
-
-    # Gửi tin nhắn từ Bot 1 (LONG/SHORT) nếu có
-    if long_short_messages:
-        send_message_to_telegram(BOT1_TOKEN, "\n".join(long_short_messages))
-        long_short_messages.clear()  # Xóa sau khi gửi
-
-    # Gửi tin nhắn từ Bot 2 (Huân chương 🥇🥈) nếu có
-    if medal_messages:
-        send_message_to_telegram(BOT2_TOKEN, "\n".join(medal_messages))
-        medal_messages.clear()  # Xóa sau khi gửi
 
 def send_message_to_telegram(bot_token, message):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
