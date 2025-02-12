@@ -30,7 +30,7 @@ def webhook():
         send_telegram_message(BOT1_TOKEN, CHAT_ID, alert_message)
     
     # Bot2 chỉ gửi tín hiệu theo dõi nến
-    if "Theo dõi" in alert_message:
+    if "👀" in alert_message:
         send_telegram_message(BOT2_TOKEN, CHAT_ID, alert_message)
     
     return jsonify({"status": "ok"})
