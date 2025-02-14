@@ -13,7 +13,7 @@ def send_telegram_message(bot_token, chat_id, message):
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     requests.post(url, json=payload)
 
-@app.route("/ping", methods=["HEAD", "GET"])
+@app.route("/", methods=["HEAD", "GET"])
 def ping():
     return "", 200
     
