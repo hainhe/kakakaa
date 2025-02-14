@@ -14,7 +14,7 @@ def send_telegram_message(bot_token, chat_id, message):
     requests.post(url, json=payload)
 
 @app.route("/", methods=["HEAD", "GET"])
-def ping():
+def keep_alive():
     return "", 200
     
 @app.route("/webhook", methods=["POST"])
