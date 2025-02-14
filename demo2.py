@@ -15,6 +15,7 @@ def send_telegram_message(bot_token, chat_id, message):
 
 @app.route("/", methods=["HEAD", "GET"])
 def keep_alive():
+    print("🟢 UptimeRobot ping received! Keeping Render alive...")
     return "", 200
     
 @app.route("/webhook", methods=["POST"])
