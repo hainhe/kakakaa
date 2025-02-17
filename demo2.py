@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import requests
+import traceback  # Thêm vào đầu file
 
 app = Flask(__name__)
 
@@ -18,32 +19,42 @@ def keep_alive():
     print("🟢 UptimeRobot ping received! Keeping Render alive...")
     return "", 200
     
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    print(f"📥 Headers: {request.headers}")
-    print(f"📥 Raw data: {request.data}")
-
     try:
         alert_message = request.data.decode("utf-8").strip()
         if not alert_message:
-            print("⚠️ No message received!")
             return jsonify({"error": "No message received"}), 400
 
-        print(f"📥 Processed Message: {alert_message}")
+        print("Received alert:", alert_message)  # Log nhận request
 
-        if "LONG" in alert_message:
-            print(f"🚀 Sending LONG signal via BOT1")
-            send_telegram_message(BOT1_TOKEN, CHAT_ID, alert_message)
+        signal = extract_signal(alert_message)
+        chart_url = extract_chart_url(alert_message)
 
-        if "SHORT" in alert_message:
-            print(f"📉 Sending SHORT signal via BOT2")
-            send_telegram_message(BOT2_TOKEN, CHAT_ID, alert_message)
+        print("Extracted signal:", signal)  # Log tín hiệu
+        print("Extracted chart URL:", chart_url)  # Log URL
+
+        image_path = None
+        if chart_url:
+            image_path = capture_chart_screenshot(chart_url)
+
+        print("Captured image path:", image_path)  # Log ảnh chụp
+
+        if signal == "LONG":
+            send_telegram_message(BOT1_TOKEN, CHAT_ID, alert_message, image_path)
+        elif signal == "SHORT":
+            send_telegram_message(BOT2_TOKEN, CHAT_ID, alert_message, image_path)
+        else:
+            return jsonify({"error": "Unknown signal type"}), 400
 
     except Exception as e:
-        print(f"❌ Error processing webhook: {e}")
+        error_message = traceback.format_exc()
+        print("Error in webhook:", error_message)  # Log lỗi chi tiết
         return jsonify({"error": str(e)}), 500
 
     return jsonify({"status": "ok"})
+
 
 
 if __name__ == "__main__":
