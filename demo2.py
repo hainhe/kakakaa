@@ -24,10 +24,10 @@ def keep_alive():
 def webhook():
     try:
         alert_message = request.data.decode("utf-8").strip()
+        print("Received alert:", alert_message)  # Log nội dung nhận được
+
         if not alert_message:
             return jsonify({"error": "No message received"}), 400
-
-        print("Received alert:", alert_message)  # Log nhận request
 
         signal = extract_signal(alert_message)
         chart_url = extract_chart_url(alert_message)
@@ -38,8 +38,7 @@ def webhook():
         image_path = None
         if chart_url:
             image_path = capture_chart_screenshot(chart_url)
-
-        print("Captured image path:", image_path)  # Log ảnh chụp
+            print("Captured image path:", image_path)  # Log ảnh chụp
 
         if signal == "LONG":
             send_telegram_message(BOT1_TOKEN, CHAT_ID, alert_message, image_path)
@@ -54,8 +53,6 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
     return jsonify({"status": "ok"})
-
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
