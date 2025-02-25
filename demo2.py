@@ -1,6 +1,6 @@
+
 from flask import Flask, request, jsonify
 import requests
-from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
@@ -12,6 +12,12 @@ CHAT_ID = "-4708928215"
 # API Key của Chart-Img
 CHART_IMG_API_KEY = "8RLLVdMVMl7MQ9SuxhU0O5cONpyTGPba1BLbaiYG"
 
+# Hàm gửi tin nhắn văn bản qua Telegram
+def send_telegram_message(bot_token, chat_id, message):
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+    requests.post(url, json=payload)
+
 # Hàm gửi ảnh qua Telegram
 def send_telegram_photo(bot_token, chat_id, photo_url, caption):
     url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
@@ -20,12 +26,6 @@ def send_telegram_photo(bot_token, chat_id, photo_url, caption):
     if response.status_code != 200:
         print(f"❌ Error sending photo: {response.text}")
 
-# Hàm gửi tin nhắn văn bản qua Telegram
-def send_telegram_message(bot_token, chat_id, message):
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-    requests.post(url, json=payload)
-
 @app.route("/", methods=["HEAD", "GET"])
 def keep_alive():
     print("🟢 UptimeRobot ping received! Keeping Render alive...")
@@ -33,9 +33,6 @@ def keep_alive():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    print(f"📥 Headers: {request.headers}")
-    print(f"📥 Raw data: {request.data}")
-
     try:
         alert_message = request.data.decode("utf-8").strip()
         if not alert_message:
@@ -44,56 +41,41 @@ def webhook():
 
         print(f"📥 Processed Message: {alert_message}")
 
-        # Giả sử alert có dạng gồm 2 dòng:
-        # Dòng 1: "LONG" hoặc "SHORT" (có thể là toàn văn bản chứa các từ này)
-        # Dòng 2: "Chart URL: https://www.tradingview.com/chart/?symbol=EURUSD"
-        # Nếu có URL chart thì chúng ta tiến hành chụp hình, ngược lại chỉ gửi tin nhắn alert
-        photo_url = None
-        if "Chart URL:" in alert_message:
-            # Tách URL chart
-            parts = alert_message.split("\n")
-            for part in parts:
-                if part.startswith("Chart URL:"):
-                    original_chart_url = part.split("Chart URL:")[1].strip()
-                    break
-            else:
-                original_chart_url = ""
-            
-            parsed_url = urlparse(original_chart_url)
-            qs = parse_qs(parsed_url.query)
-            symbol = qs.get('symbol', [''])[0]
-            if not symbol:
-                print("⚠️ Symbol not found in the URL!")
-                symbol = "Unknown"
-            
-            # Tạo URL chụp ảnh chart với Chart-Img (giả sử interval cố định là 15m và theme là dark)
-            chart_img_url = (f"https://api.chart-img.com/v1/tradingview/advanced-chart?"
-                             f"key={CHART_IMG_API_KEY}&symbol={symbol}&interval=15m&theme=dark")
-            
-            response = requests.get(chart_img_url)
-            if response.status_code == 200:
-                photo_url = response.url  # URL ảnh chụp từ Chart-Img
-                print(f"✅ Screenshot captured: {photo_url}")
-            else:
-                print(f"❌ Error capturing screenshot: {response.status_code} - {response.text}")
-        
-        # Tạo caption cho alert
-        # Giả sử nếu alert chứa từ LONG hoặc SHORT thì đó là tín hiệu tương ứng.
-        if "LONG" in alert_message.upper():
-            alert_caption = "🚀 LONG Signal"
+        # Chọn BOT token dựa trên tín hiệu trong alert (LONG hay SHORT)
+        if "🚀 LONG 🚀:" in alert_message:
             bot_token = BOT1_TOKEN
-        elif "SHORT" in alert_message.upper():
-            alert_caption = "📉 SHORT Signal"
+        elif "🚨 SHORT 🚨:" in alert_message:
             bot_token = BOT2_TOKEN
         else:
-            alert_caption = "Alert Signal"
-            bot_token = BOT1_TOKEN  # Mặc định BOT1
-        
-        # Nếu có hình thì gửi ảnh kèm caption, ngược lại chỉ gửi tin nhắn văn bản
-        if photo_url:
-            send_telegram_photo(bot_token, CHAT_ID, photo_url, alert_caption + "\n" + alert_message)
+            bot_token = BOT1_TOKEN  # Mặc định nếu không xác định
+
+        # Gửi alert nguyên văn đến Telegram
+        send_telegram_message(bot_token, CHAT_ID, alert_message)
+
+        # Trích xuất symbol từ giữa "🌜" và "🌛"
+        start = alert_message.find("🌜")
+        end = alert_message.find("🌛", start)
+        if start != -1 and end != -1:
+            symbol = alert_message[start + len("🌜"):end].strip()
+            print(f"✅ Extracted symbol: {symbol}")
         else:
-            send_telegram_message(bot_token, CHAT_ID, alert_caption + "\n" + alert_message)
+            print("⚠️ Symbol not found in alert message; skipping screenshot.")
+            return jsonify({"status": "ok"})
+
+        # Tạo URL chụp ảnh chart với Chart-Img (ở đây interval cố định là 15m, theme là dark)
+        chart_img_url = (
+            f"https://api.chart-img.com/v1/tradingview/advanced-chart?"
+            f"key={CHART_IMG_API_KEY}&symbol={symbol}&interval=15m&theme=dark"
+        )
+
+        response = requests.get(chart_img_url)
+        if response.status_code == 200:
+            photo_url = response.url  # Lấy URL ảnh được trả về từ Chart‑Img
+            print(f"✅ Screenshot captured: {photo_url}")
+            # Gửi ảnh kèm với tin nhắn (caption có thể để trống hoặc bổ sung thông tin nếu cần)
+            send_telegram_photo(bot_token, CHAT_ID, photo_url, "")
+        else:
+            print(f"❌ Error capturing screenshot: {response.status_code} - {response.text}")
 
     except Exception as e:
         print(f"❌ Error processing webhook: {e}")
