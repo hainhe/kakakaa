@@ -1,3 +1,4 @@
+import re
 from flask import Flask, request, jsonify
 import requests
 from urllib.parse import urlparse, parse_qs
@@ -44,16 +45,17 @@ def webhook():
 
         print(f"📥 Processed Message: {alert_message}")
 
-        lines = alert_message.split("\n")
-        signal = lines[0].split(": ")[1].strip()  # "Long" hoặc "Short"
-        original_chart_url = lines[1].split(": ")[1].strip()
+        # Trích xuất signal
+        if "LONG" in alert_message:
+            signal = "Long"
+        elif "SHORT" in alert_message:
+            signal = "Short"
+        else:
+            signal = "Unknown"
 
-        parsed_url = urlparse(original_chart_url)
-        qs = parse_qs(parsed_url.query)
-        symbol = qs.get('symbol', [''])[0]
-        if not symbol:
-            print("⚠️ Symbol not found in the URL!")
-            symbol = "Unknown"
+        # Trích xuất symbol bằng regex
+        match = re.search(r'🌜(.*?)🌛', alert_message)
+        symbol = match.group(1) if match else "Unknown"
 
         # Tạo URL chụp ảnh chart với Chart-Img
         chart_img_url = (f"https://api.chart-img.com/v1/tradingview/advanced-chart?"
@@ -69,14 +71,14 @@ def webhook():
 
         alert_caption = f"Signal: {signal}\nPair: {symbol}"
 
-        if "Long" in signal:
+        if signal == "Long":
             print("🚀 Sending LONG signal via BOT1")
             if photo_url:
                 send_telegram_photo(BOT1_TOKEN, CHAT_ID, photo_url, alert_caption)
             else:
                 send_telegram_message(BOT1_TOKEN, CHAT_ID, f"{alert_caption}\n(Ảnh không chụp được)")
 
-        if "Short" in signal:
+        elif signal == "Short":
             print("📉 Sending SHORT signal via BOT2")
             if photo_url:
                 send_telegram_photo(BOT2_TOKEN, CHAT_ID, photo_url, alert_caption)
