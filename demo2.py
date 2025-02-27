@@ -45,45 +45,35 @@ def webhook():
 
         print(f"📥 Processed Message: {alert_message}")
 
-        # Trích xuất signal
-        if "LONG" in alert_message:
-            signal = "Long"
-        elif "SHORT" in alert_message:
-            signal = "Short"
-        else:
-            signal = "Unknown"
-
-        # Trích xuất symbol bằng regex
+        # Trích xuất symbol để chụp ảnh biểu đồ
         match = re.search(r'🌜(.*?)🌛', alert_message)
         symbol = match.group(1) if match else "Unknown"
 
         # Tạo URL chụp ảnh chart với Chart-Img
         chart_img_url = (f"https://api.chart-img.com/v1/tradingview/advanced-chart?"
-                         f"key={CHART_IMG_API_KEY}&symbol={symbol}&interval=15m&theme=dark")
+                        f"key={CHART_IMG_API_KEY}&symbol={symbol}&interval=15m&theme=dark")
 
         response = requests.get(chart_img_url)
         if response.status_code == 200:
-            photo_url = response.url  # URL ảnh chụp từ Chart-Img
+            photo_url = response.url
             print(f"✅ Screenshot captured: {photo_url}")
         else:
             photo_url = None
             print(f"❌ Error capturing screenshot: {response.status_code} - {response.text}")
 
-        alert_caption = f"Signal: {signal}\nPair: {symbol}"
-
-        if signal == "Long":
+        # Xác định bot dựa trên tín hiệu
+        if "LONG" in alert_message:
             print("🚀 Sending LONG signal via BOT1")
             if photo_url:
-                send_telegram_photo(BOT1_TOKEN, CHAT_ID, photo_url, alert_caption)
+                send_telegram_photo(BOT1_TOKEN, CHAT_ID, photo_url, alert_message)
             else:
-                send_telegram_message(BOT1_TOKEN, CHAT_ID, f"{alert_caption}\n(Ảnh không chụp được)")
-
-        elif signal == "Short":
+                send_telegram_message(BOT1_TOKEN, CHAT_ID, f"{alert_message}\n(Ảnh không chụp được)")
+        elif "SHORT" in alert_message:
             print("📉 Sending SHORT signal via BOT2")
             if photo_url:
-                send_telegram_photo(BOT2_TOKEN, CHAT_ID, photo_url, alert_caption)
+                send_telegram_photo(BOT2_TOKEN, CHAT_ID, photo_url, alert_message)
             else:
-                send_telegram_message(BOT2_TOKEN, CHAT_ID, f"{alert_caption}\n(Ảnh không chụp được)")
+                send_telegram_message(BOT2_TOKEN, CHAT_ID, f"{alert_message}\n(Ảnh không chụp được)")
 
     except Exception as e:
         print(f"❌ Error processing webhook: {e}")
