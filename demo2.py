@@ -36,10 +36,10 @@ def webhook():
         print(f"📥 Processed Message: {alert_message}")
 
         # Xác định bot dựa trên tín hiệu
-        if "LONG" in alert_message:
+        if "🟩" in alert_message:
             print("🚀 Sending LONG signal via BOT1")
             send_telegram_message(BOT1_TOKEN, CHAT_ID, alert_message)
-        elif "SHORT" in alert_message:
+        elif "🟥" in alert_message:
             print("📉 Sending SHORT signal via BOT2")
             send_telegram_message(BOT2_TOKEN, CHAT_ID, alert_message)
 
